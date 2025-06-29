@@ -6,9 +6,8 @@ import pprint
 import webbrowser
 from urllib.parse import urlparse, parse_qs
 import base64
-def get_authorization_code(client_id: str, redirect_uri: str, state: str) -> None:
 
-    load_dotenv(override=True)
+def get_authorization_code(client_id: str, redirect_uri: str, state: str) -> None:
 
     params = {
         "client_id": client_id,
@@ -29,17 +28,16 @@ def get_authorization_code(client_id: str, redirect_uri: str, state: str) -> Non
     pprint.pprint(f"Authorization Code: {authorization_code[0] if authorization_code else 'Not found'}")
     set_key(".env", "AUTHORIZATION_CODE", authorization_code[0])
 
-def get_access_token(redirect_uri: str, code: str, authorization_code: str) -> None:
-    load_dotenv(override=True)
+def get_access_token(redirect_uri: str, authorization_code: str, encoded_credentials: str) -> None:
     body = {
         "grant_type": "authorization_code",
-        "code": code,
+        "code": authorization_code,
         "redirect_uri": redirect_uri
     }
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": authorization_code
+        "Authorization": encoded_credentials
     }
 
     response = r.post("https://accounts.spotify.com/api/token", data=body, headers=headers)
@@ -50,16 +48,15 @@ def get_access_token(redirect_uri: str, code: str, authorization_code: str) -> N
     set_key(".env", "REFRESH_TOKEN", refresh_token)
 
 
-def refresh_token(refresh_token: str, authorization_code: str) -> None:
-    load_dotenv(override=True)
+def refresh_token(refresh_token: str, encoded_credentials: str) -> None:
     body = {
         "grant_type": "refresh_token",
-        "refresh_token": os.getenv("REFRESH_TOKEN")
+        "refresh_token": refresh_token
     }
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": authorization_code
+        "Authorization": encoded_credentials
     }
 
     response = r.post("https://accounts.spotify.com/api/token", data=body, headers=headers)
@@ -69,9 +66,35 @@ def refresh_token(refresh_token: str, authorization_code: str) -> None:
     else:
         set_key(".env", "ACCESS_TOKEN", response.json().get("access_token"))
 
+def uuid_generator() -> str:
+    return str(uuid.uuid4())
+
+def encode_client_credentials(client_id: str, client_secret: str) -> str:
+    credentials = f"{client_id}:{client_secret}"
+    encoded_credentials = base64.b64encode(credentials.encode()).decode()
+    return f"Basic {encoded_credentials}"
+
 def auth_flow() -> None:
     set_key(".env", "AUTHORIZATION_CODE", "")
-    get_authorization_code(os.getenv("CLIENT_ID"), os.getenv("REDIRECT_URI"), str(uuid.uuid4()))
+
     load_dotenv(override=True)
-    get_access_token(os.getenv("REDIRECT_URI"), os.getenv("AUTHORIZATION_CODE"), f"Basic {base64.b64encode(f'{os.getenv('CLIENT_ID')}:{os.getenv('CLIENT_SECRET')}'.encode()).decode()}")
-    refresh_token(os.getenv("REFRESH_TOKEN"), f"Basic {base64.b64encode(f'{os.getenv('CLIENT_ID')}:{os.getenv('CLIENT_SECRET')}'.encode()).decode()}")
+
+    client_id = os.getenv("CLIENT_ID")
+    redirect_uri = os.getenv("REDIRECT_URI")
+    client_secret = os.getenv("CLIENT_SECRET")
+    encoded_client_credentials = encode_client_credentials(client_id, client_secret)
+    random_state = uuid_generator()
+
+    get_authorization_code(client_id,redirect_uri, random_state)
+
+    load_dotenv(override=True)
+
+    authorization_code = os.getenv("AUTHORIZATION_CODE")
+
+    get_access_token(redirect_uri, authorization_code, encoded_client_credentials)
+
+    load_dotenv(override=True)
+
+    refresh_token_value = os.getenv("REFRESH_TOKEN")
+
+    refresh_token(refresh_token_value, encoded_client_credentials)
