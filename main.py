@@ -11,7 +11,7 @@ import base64
 
 def get_authorization_code():
 
-    load_dotenv()
+    load_dotenv(override=True)
 
     client_id = os.getenv("CLIENT_ID")
     redirect_uri = os.getenv("REDIRECT_URI")
@@ -30,10 +30,11 @@ def get_authorization_code():
     query_params = parse_qs(parsed_url.query)
 
     authorization_code = query_params.get("code")
+    pprint.pprint(f"Authorization Code: {authorization_code[0] if authorization_code else 'Not found'}")
     set_key(".env", "AUTHORIZATION_CODE", authorization_code[0])
 
 def get_access_token():
-    load_dotenv()
+    load_dotenv(override=True)
     client_secret = os.getenv("CLIENT_SECRET")
     client_id = os.getenv("CLIENT_ID")
     body = {
@@ -55,7 +56,7 @@ def get_access_token():
 
 
 def refresh_token():
-    load_dotenv()
+    load_dotenv(override=True)
     body = {
         "grant_type": "refresh_token",
         "refresh_token": os.getenv("REFRESH_TOKEN")
@@ -70,8 +71,25 @@ def refresh_token():
     if response.json().get("refresh_token"):
         pprint.pprint(response.json())
         set_key(".env", "REFRESH_TOKEN", response.json().get("refresh_token"))
+    else:
+        set_key(".env", "ACCESS_TOKEN", response.json().get("access_token"))
 
 
-get_authorization_code()
-get_access_token()
-refresh_token()
+def get_recently_played():
+    headers = {
+        "Authorization": f"Bearer {os.getenv('ACCESS_TOKEN')}"
+    }
+
+    response = r.get("https://api.spotify.com/v1/me/player/recently-played", headers=headers)
+
+    pprint.pprint(response.json().get("items"))
+
+def auth_flow():
+    set_key(".env", "AUTHORIZATION_CODE", "")
+    get_authorization_code()
+    get_access_token()
+    refresh_token()
+
+auth_flow()
+
+get_recently_played()
