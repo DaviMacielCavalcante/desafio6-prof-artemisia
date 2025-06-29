@@ -2,7 +2,7 @@ import requests as r
 import os
 import pprint
 
-def get_recently_played():
+def get_recently_played() -> None:
     headers = {
         "Authorization": f"Bearer {os.getenv('ACCESS_TOKEN')}"
     }
